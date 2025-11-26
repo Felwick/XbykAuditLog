@@ -12,14 +12,17 @@ namespace Customizations.Delegates
         {
             var userName = MembershipContext.AuthenticatedUser?.UserName ?? "Anonymous";
 
-            var data = new EventLogData(eventType, nameof(LoggingEventDelegates), eventCode)
-            {
-                EventDescription = string.Format(messageTemplate, name, id, userName),
-                EventTime = DateTime.UtcNow,
-                UserName = userName
-            };
+            var item = new EventLogItem(
+                eventType: eventType,
+                eventSource: nameof(LoggingEventDelegates),
+                eventCode: eventCode,
+                messageTemplate: messageTemplate,
+                pageName: name,
+                pageId: id,
+                userName: userName,
+                eventTime: DateTime.UtcNow);
 
-            BackgroundEventLogger.Instance.Enqueue(data);
+            BackgroundEventLogger.Instance.Enqueue(item);
         }
 
         public static void WebPageEvents_Publish(object sender, PublishWebPageEventArgs e)

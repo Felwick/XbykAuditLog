@@ -2,6 +2,7 @@ using CMS.Core;
 using CMS.EventLog;
 using System;
 using System.Collections.Concurrent;
+using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -12,7 +13,7 @@ namespace Customizations.Delegates
         private static readonly Lazy<BackgroundEventLogger> _lazy = new(() => new BackgroundEventLogger());
         public static BackgroundEventLogger Instance => _lazy.Value;
 
-        private readonly ConcurrentQueue<EventLogData> _queue = new();
+        private readonly ConcurrentQueue<EventLogItem> _queue = new();
         private readonly ManualResetEventSlim _signal = new(false);
         private readonly CancellationTokenSource _cts = new();
         private readonly Task _worker;
@@ -23,14 +24,14 @@ namespace Customizations.Delegates
         {
             _eventLogService = Service.Resolve<IEventLogService>();
             _worker = Task.Factory.StartNew(ProcessQueue, TaskCreationOptions.LongRunning);
-            AppDomain.CurrentDomain.ProcessExit += (_,_) => Dispose();
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => Dispose();
         }
 
-        public void Enqueue(EventLogData data)
+        public void Enqueue(EventLogItem item)
         {
-            if (_disposed) return;
+            if (_disposed || item is null) return;
 
-            _queue.Enqueue(data);
+            _queue.Enqueue(item);
             _signal.Set();
         }
 
@@ -55,7 +56,8 @@ namespace Customizations.Delegates
                     {
                         try
                         {
-                            _eventLogService.LogEvent(item);
+                            var data = item.ToEventLogData();
+                            _eventLogService.LogEvent(data);
                         }
                         catch
                         {
@@ -74,7 +76,8 @@ namespace Customizations.Delegates
                 {
                     try
                     {
-                        _eventLogService.LogEvent(remaining);
+                        var data = remaining.ToEventLogData();
+                        _eventLogService.LogEvent(data);
                     }
                     catch
                     {
@@ -104,7 +107,34 @@ namespace Customizations.Delegates
                 }
                 catch
                 {
-                    // ignore
+                    // ignore worker wait failures
+                }
+
+                // Persist any remaining items to a file (best-effort).
+                try
+                {
+                    if (!_queue.IsEmpty)
+                    {
+                        var logDir = Path.Combine(AppContext.BaseDirectory, "Logs");
+                        Directory.CreateDirectory(logDir);
+
+                        var fileName = $"BackgroundEventLoggerQueueDump_{DateTime.UtcNow:yyyyMMdd_HHmmss}.log";
+                        var filePath = Path.Combine(logDir, fileName);
+
+                        using var fs = new FileStream(filePath, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                        using var writer = new StreamWriter(fs);
+
+                        while (_queue.TryDequeue(out var item))
+                        {
+                            writer.WriteLine(item.ToLogLine());
+                        }
+
+                        writer.Flush();
+                    }
+                }
+                catch
+                {
+                    // Swallow file I/O exceptions during shutdown to avoid throwing from Dispose.
                 }
             }
             finally
