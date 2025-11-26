@@ -2,105 +2,66 @@
 using CMS.EventLog;
 using CMS.Membership;
 using CMS.Websites;
-using Microsoft.AspNetCore.Http;
-using Mono.Cecil;
-using System.ComponentModel;
-using System.Diagnostics.Tracing;
+using System;
 
 namespace Customizations.Delegates
 {
     public class LoggingEventDelegates
     {
-        private static readonly IEventLogService _eventLogService = Service.Resolve<IEventLogService>();
+        private static void EnqueueWebPageEvent(EventTypeEnum eventType, string eventCode, string messageTemplate, string name, object id)
+        {
+            var userName = MembershipContext.AuthenticatedUser?.UserName ?? "Anonymous";
+
+            var data = new EventLogData(eventType, nameof(LoggingEventDelegates), eventCode)
+            {
+                EventDescription = string.Format(messageTemplate, name, id, userName),
+                EventTime = DateTime.UtcNow,
+                UserName = userName
+            };
+
+            BackgroundEventLogger.Instance.Enqueue(data);
+        }
 
         public static void WebPageEvents_Publish(object sender, PublishWebPageEventArgs e)
         {
-            var data = new EventLogData(
-                EventTypeEnum.Information,
-                nameof(LoggingEventDelegates),
-                "WebPagePublished");
-
-
-            data.EventDescription = $"Web page '{e.Name}' with ID '{e.ID}' has been published. By user '{MembershipContext.AuthenticatedUser}'";
-            data.EventTime = DateTime.Now;
-            data.UserName = MembershipContext.AuthenticatedUser?.UserName ?? "Anonymous";
-
-            _eventLogService.LogEvent(data);
+            EnqueueWebPageEvent(EventTypeEnum.Information, "WebPagePublished",
+                "Web page '{0}' with ID '{1}' has been published. By user '{2}'",
+                e.Name, e.ID);
         }
 
         public static void WebPageEvents_CreateLanguageVariant(object? sender, CreateWebPageLanguageVariantEventArgs e)
         {
-            var data = new EventLogData(
-                EventTypeEnum.Information,
-                nameof(LoggingEventDelegates),
-                "LanguageVariantCreated");
-
-
-            data.EventDescription = $"Web page '{e.Name}' with ID '{e.ID}' was created. By user '{MembershipContext.AuthenticatedUser}'";
-            data.EventTime = DateTime.Now;
-            data.UserName = MembershipContext.AuthenticatedUser?.UserName ?? "Anonymous";
-
-            _eventLogService.LogEvent(data);
+            EnqueueWebPageEvent(EventTypeEnum.Information, "LanguageVariantCreated",
+                "Web page '{0}' with ID '{1}' was created. By user '{2}'",
+                e.Name, e.ID);
         }
 
         public static void WebPageEvents_Delete(object? sender, DeleteWebPageEventArgs e)
         {
-            var data = new EventLogData(
-                EventTypeEnum.Information,
-                nameof(LoggingEventDelegates),
-                "WebPagePublished");
-
-
-            data.EventDescription = $"Web page '{e.Name}' with ID '{e.ID}' has been published. By user '{MembershipContext.AuthenticatedUser}'";
-            data.EventTime = DateTime.Now;
-            data.UserName = MembershipContext.AuthenticatedUser?.UserName ?? "Anonymous";
-
-            _eventLogService.LogEvent(data);
+            EnqueueWebPageEvent(EventTypeEnum.Information, "WebPageDeleted",
+                "Web page '{0}' with ID '{1}' has been deleted. By user '{2}'",
+                e.Name, e.ID);
         }
 
         public static void WebPageEvents_Unpublish(object? sender, UnpublishWebPageEventArgs e)
         {
-            var data = new EventLogData(
-               EventTypeEnum.Information,
-               nameof(LoggingEventDelegates),
-               "WebPageUnpublished");
-
-
-            data.EventDescription = $"Web page '{e.Name}' with ID '{e.ID}' has been unpublished. By user '{MembershipContext.AuthenticatedUser}'";
-            data.EventTime = DateTime.Now;
-            data.UserName = MembershipContext.AuthenticatedUser?.UserName ?? "Anonymous";
-
-            _eventLogService.LogEvent(data);
+            EnqueueWebPageEvent(EventTypeEnum.Information, "WebPageUnpublished",
+                "Web page '{0}' with ID '{1}' has been unpublished. By user '{2}'",
+                e.Name, e.ID);
         }
 
         public static void WebPageEvents_Create(object? sender, CreateWebPageEventArgs e)
         {
-            var data = new EventLogData(
-               EventTypeEnum.Information,
-               nameof(LoggingEventDelegates),
-               "WebPageCreate");
-
-
-            data.EventDescription = $"Web page '{e.Name}' with ID '{e.ID}' has been created. By user '{MembershipContext.AuthenticatedUser}'";
-            data.EventTime = DateTime.Now;
-            data.UserName = MembershipContext.AuthenticatedUser?.UserName ?? "Anonymous";
-
-            _eventLogService.LogEvent(data);
+            EnqueueWebPageEvent(EventTypeEnum.Information, "WebPageCreated",
+                "Web page '{0}' with ID '{1}' has been created. By user '{2}'",
+                e.Name, e.ID);
         }
 
         public static void WebPageEvents_UpdateDraft(object sender, UpdateWebPageDraftEventArgs e)
         {
-            var data = new EventLogData(
-               EventTypeEnum.Information,
-               nameof(LoggingEventDelegates),
-               "WebPageDraftUpdate");
-
-
-            data.EventDescription = $"Web page draft '{e.Name}' with ID '{e.ID}' has been updated. By user '{MembershipContext.AuthenticatedUser}'";
-            data.EventTime = DateTime.Now;
-            data.UserName = MembershipContext.AuthenticatedUser?.UserName ?? "Anonymous";
-
-            _eventLogService.LogEvent(data);
+            EnqueueWebPageEvent(EventTypeEnum.Information, "WebPageDraftUpdate",
+                "Web page draft '{0}' with ID '{1}' has been updated. By user '{2}'",
+                e.Name, e.ID);
         }
     }
 }
